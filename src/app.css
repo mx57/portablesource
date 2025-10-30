@@ -37,6 +37,7 @@
   --button-secondary-text: #495057;
   --button-danger: #dc3545;
   --button-danger-hover: #c82333;
+  --button-danger-active: #a71e2a;
   --card-bg: #ffffff;
   --card-border: #e9ecef;
   --progress-bg: #dfe3ea;
@@ -123,6 +124,7 @@
   --button-secondary-text: #cbd5e1;
   --button-danger: #f87171;
   --button-danger-hover: #ef4444;
+  --button-danger-active: #dc2626;
   --card-bg: #1e293b;
   --card-border: #475569;
   --progress-bg: #475569;

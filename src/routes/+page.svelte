@@ -280,7 +280,7 @@
         
         // Copy self to installation path
         try {
-          const copyResult = await invoke('copy_self_to_install_path', { installPath: installPath }) as {success: boolean, message?: string};
+          const copyResult = await invoke('copy_self_to_install_path', { install_path: installPath }) as {success: boolean, message?: string};
           
           if (!copyResult.success) {
             installStatus = `Self-copy error: ${copyResult.message}`;
@@ -362,7 +362,7 @@
   // Environment functions
   async function checkEnvironmentSetup() {
     try {
-      const envStatus = await invoke('check_environment_status', { install_path: installPath, installPath }) as {
+      const envStatus = await invoke('check_environment_status', { install_path: installPath }) as {
         environment_exists: boolean,
         setup_completed: boolean,
         overall_status: string
@@ -377,7 +377,7 @@
   async function checkEnvironmentStatus() {
     try {
       isCheckingEnvironment = true;
-      const status = await invoke('check_environment_status', { install_path: installPath, installPath }) as {
+      const status = await invoke('check_environment_status', { install_path: installPath }) as {
         environment_exists: boolean,
         setup_completed: boolean,
         overall_status: string
@@ -451,7 +451,7 @@
       if (stallWatchInterval) { clearInterval(stallWatchInterval); stallWatchInterval = null; }
     });
 
-    await invoke('setup_environment_stream', { install_path: installPath, installPath, event_id: eventId, eventId });
+    await invoke('setup_environment_stream', { install_path: installPath, event_id: eventId });
 
     // Start watchdog to handle rare cases when finished event is missed
     if (stallWatchInterval) { clearInterval(stallWatchInterval); }
@@ -459,7 +459,7 @@
       const secondsSince = Math.floor((Date.now() - lastProgressAt) / 1000);
       if (secondsSince >= stallTimeoutSec) {
         try {
-          const status = await invoke('check_environment_status', { install_path: installPath, installPath }) as {
+          const status = await invoke('check_environment_status', { install_path: installPath }) as {
             environment_exists: boolean,
             setup_completed: boolean,
             overall_status: string
@@ -491,7 +491,7 @@
 
       // Prefer asking CLI to list repos with source tags
       try {
-        const res = await invoke('run_cli_command', { install_path: installPath, installPath, args: ['list-repos'] }) as { success: boolean, stdout: string, stderr: string };
+        const res = await invoke('run_cli_command', { install_path: installPath, args: ['list-repos'] }) as { success: boolean, stdout: string, stderr: string };
         if (res && res.success) {
           const lines = (res.stdout || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean);
           for (const line of lines) {
@@ -518,8 +518,8 @@
 
       // Fallback: filesystem intersection if CLI not available or returned nothing
       if (installed.length === 0) {
-        const envsFolders = await invoke('list_directory_folders', { install_path: installPath, installPath, directory_name: 'envs', directoryName: 'envs' }) as string[];
-        const reposFolders = await invoke('list_directory_folders', { install_path: installPath, installPath, directory_name: 'repos', directoryName: 'repos' }) as string[];
+        const envsFolders = await invoke('list_directory_folders', { install_path: installPath, directory_name: 'envs' }) as string[];
+        const reposFolders = await invoke('list_directory_folders', { install_path: installPath, directory_name: 'repos' }) as string[];
         const envSet = new Set((envsFolders || []).map((n) => (n || '').toLowerCase()));
         for (const repoName of reposFolders || []) {
           const match = envSet.has((repoName || '').toLowerCase());
@@ -628,7 +628,7 @@
       
       const cliArgs = ['--install-repo', repoName];
       
-      const result = await invoke('run_cli_command', { install_path: installPath, installPath, args: cliArgs }) as {success: boolean, stdout: string, stderr: string, exit_code: number | null};
+      const result = await invoke('run_cli_command', { install_path: installPath, args: cliArgs }) as {success: boolean, stdout: string, stderr: string, exit_code: number | null};
       
       if (result.success) {
         await loadInstalledRepos();
@@ -729,7 +729,7 @@
       }
 
       // Ensure environment is ready
-      const envStatus = await invoke('check_environment_status', { install_path: installPath, installPath }) as {
+      const envStatus = await invoke('check_environment_status', { install_path: installPath }) as {
         environment_exists: boolean, setup_completed: boolean, overall_status: string
       };
       
@@ -748,7 +748,7 @@
       const cliArgs = ['--install-repo', userInput];
       
       const result = await invoke('run_cli_command', {
-        install_path: installPath, installPath, args: cliArgs
+        install_path: installPath, args: cliArgs
       }) as {success: boolean, stdout: string, stderr: string, exit_code: number | null};
 
       if (result.success) {
@@ -840,9 +840,9 @@
   async function checkRepoInstallStatus(repoName: string): Promise<boolean> {
     try {
       // Get folder lists in envs and repos directories
-      const envsFolders = await invoke('list_directory_folders', { install_path: installPath, installPath, directory_name: 'envs', directoryName: 'envs' }) as string[];
+      const envsFolders = await invoke('list_directory_folders', { install_path: installPath, directory_name: 'envs' }) as string[];
       
-      const reposFolders = await invoke('list_directory_folders', { install_path: installPath, installPath, directory_name: 'repos', directoryName: 'repos' }) as string[];
+      const reposFolders = await invoke('list_directory_folders', { install_path: installPath, directory_name: 'repos' }) as string[];
       
       // Repository is considered installed only if it exists in both directories
       const isInEnvs = envsFolders.includes(repoName);
@@ -861,20 +861,17 @@
       consoleService.info(`Starting repository: ${repoName}`, 'Repository');
       installStatus = $_('repositories.starting', { values: { repoName } });
       
+      // Sanitize repoName to create a valid filename
+      const sanitizedRepoName = repoName.replace(/[^a-zA-Z0-9_]/g, '_');
+
       // Run batch file start_repo_name.bat from repository folder in new console window
-      const batFile = `start_${repoName}.bat`;
+      const batFile = `start_${sanitizedRepoName}.bat`;
       const workingDir = `${installPath}\\repos\\${repoName}`;
-      
-      
       
       const result = await invoke('run_batch_in_new_window', {
         batch_file: batFile,
-        working_dir: workingDir,
-        batchFile: batFile,
-        workingDir: workingDir
+        working_dir: workingDir
       }) as {success: boolean, stdout: string, stderr: string, exit_code: number | null};
-      
-      
       
       if (result.success) {
         installStatus = $_('repositories.started_success', { values: { repoName } });
@@ -901,7 +898,6 @@
       // Use CLI command --update-repo
       const result = await invoke('run_cli_command', {
         install_path: installPath,
-        installPath,
         args: ['--update-repo', repoName]
       }) as {success: boolean, stdout: string, stderr: string, exit_code: number | null};
       
@@ -935,7 +931,7 @@
       let result: { success: boolean; message: string } = { success: false, message: 'pending' };
 
       // Start native delete without awaiting to avoid hanging the handler
-      (invoke('delete_repository', { install_path: installPath, installPath, repo_name: repoName, repoName: repoName }) as Promise<{success: boolean, message: string}>)
+      (invoke('delete_repository', { install_path: installPath, repo_name: repoName }) as Promise<{success: boolean, message: string}>)
         .then((res) => {
           if (!completed) {
             completed = true;
@@ -955,8 +951,8 @@
         const envPath = `${installPath}\\envs\\${repoName}`;
         const repoPath = `${installPath}\\repos\\${repoName}`;
         try {
-          await invoke('run_command', { command: `Remove-Item -Path "${envPath}" -Recurse -Force -ErrorAction SilentlyContinue`, working_dir: installPath, workingDir: installPath });
-          await invoke('run_command', { command: `Remove-Item -Path "${repoPath}" -Recurse -Force -ErrorAction SilentlyContinue`, working_dir: installPath, workingDir: installPath });
+          await invoke('run_command', { command: `Remove-Item -Path "${envPath}" -Recurse -Force -ErrorAction SilentlyContinue`, working_dir: installPath });
+          await invoke('run_command', { command: `Remove-Item -Path "${repoPath}" -Recurse -Force -ErrorAction SilentlyContinue`, working_dir: installPath });
           result = { success: true, message: 'removed by fallback' };
           completed = true;
           
@@ -1006,15 +1002,13 @@
       // Remove all folders from envs
       const envResult = await invoke('run_command', {
         command: `Remove-Item -Path "${installPath}\\envs\\*" -Recurse -Force -ErrorAction SilentlyContinue`,
-        working_dir: installPath,
-        workingDir: installPath
+        working_dir: installPath
       }) as {success: boolean, stdout: string, stderr: string, exit_code: number | null};
       
       // Remove all folders from repos
       const repoResult = await invoke('run_command', {
         command: `Remove-Item -Path "${installPath}\\repos\\*" -Recurse -Force -ErrorAction SilentlyContinue`,
-        working_dir: installPath,
-        workingDir: installPath
+        working_dir: installPath
       }) as {success: boolean, stdout: string, stderr: string, exit_code: number | null};
       
       // Update installed repositories list
@@ -2731,6 +2725,12 @@
     border-color: var(--border-error);
     transform: translateY(-1px);
     box-shadow: 0 4px 15px rgba(220, 53, 69, 0.4);
+  }
+
+  .danger-btn:active:not(:disabled) {
+    background: var(--button-danger-active) !important;
+    transform: translateY(0);
+    box-shadow: none;
   }
   
   .btn-danger.disabled,
